@@ -17,33 +17,36 @@ A shared household budget tracker that lets multiple people log weekly expenses 
 
 ### Frontend
 ```bash
+cd client
 npm install
 npm run dev
 ```
 
 ### Backend API
 ```bash
-npm run server
+cd server
+npm install
+npm run dev
 ```
 
 The frontend expects an API URL via `PUBLIC_API_URL` (defaults to `http://localhost:3001`).
 
 ## Environment
 
-Backend (`server`):
+Backend (`server/.env`):
 - `MONGODB_URI`
 - `PORT` (optional)
 - `APP_URL` (used for invite links)
 - `CORS_ORIGIN` (comma-separated)
 
-Frontend:
+Frontend (`client/.env`):
 - `PUBLIC_API_URL`
 
 ## Project structure
-- `src/components/BudgetApp.jsx`: main UI and client logic
+- `client/src/components/BudgetApp.jsx`: main UI and client logic
 - `server/index.js`: API routes
 - `server/models/*`: Mongoose models
-- `public/manifest.webmanifest`, `public/sw.js`: PWA assets
+- `client/public/manifest.webmanifest`, `client/public/sw.js`: PWA assets
 
 ## Notes
 - Sessions persist until logout.
