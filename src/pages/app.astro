@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BudgetApp from '../components/BudgetApp.jsx';
+---
+<BaseLayout title="Weekly Budget" description="Track household spending together">
+  <main class="bg-slate-900 min-h-screen">
+    <div class="max-w-md mx-auto w-full">
+      <BudgetApp client:load />
+    </div>
+  </main>
+</BaseLayout>
