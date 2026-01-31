@@ -23,7 +23,7 @@ const ALL_CATEGORIES = [
   { id: 'other', label: 'Other', icon: '📦' },
 ];
 
-const BUDGET_PRESETS = [300, 400, 500, 600, 750, 1000];
+const BUDGET_PRESETS = [300, 400, 500, 600, 750, 900];
 const DEFAULT_FAVORITES = ['groceries', 'dining', 'coffee', 'gas'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
@@ -371,7 +371,7 @@ function CategoriesScreen({ favorites, setFavorites, onNext, onBack, step }) {
           <span className="text-emerald-500 ml-2 font-semibold">{favorites.length}/6</span>
         </p>
 
-        <div className="grid grid-cols-4 gap-2 overflow-y-auto flex-1 pb-4">
+        <div className="grid grid-cols-4 gap-2 overflow-y-auto flex-1 p-2">
           {ALL_CATEGORIES.map((cat) => {
             const isSelected = favorites.includes(cat.id);
             const isDisabled = favorites.length >= 6 && !isSelected;
