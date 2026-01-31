@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import JoinScreen from '../components/JoinScreen.jsx';
+---
+<BaseLayout title="Join" description="Join your budget">
+  <main class="bg-slate-950 min-h-screen">
+    <div class="max-w-md mx-auto w-full">
+      <JoinScreen client:load />
+    </div>
+  </main>
+</BaseLayout>
