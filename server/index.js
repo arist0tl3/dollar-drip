@@ -58,7 +58,6 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.post('/api/households', async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { name, weeklyBudget, timezone = 'UTC', owner, members = [] } = req.body;
     if (!name || !owner?.email || !owner?.name || !weeklyBudget) {
       return res.status(400).json({ success: false, error: 'Missing fields' });
@@ -116,7 +115,6 @@ app.post('/api/households', async (req, res) => {
 
 app.get('/api/households/:id', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const household = await Household.findById(req.params.id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
     if (!household._id.equals(req.session.householdId)) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -130,7 +128,6 @@ app.get('/api/households/:id', authMiddleware, async (req, res) => {
 
 app.patch('/api/households/:id', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { weeklyBudget, timezone } = req.body;
     const household = await Household.findById(req.params.id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
@@ -148,7 +145,6 @@ app.patch('/api/households/:id', authMiddleware, async (req, res) => {
 
 app.post('/api/households/:id/members', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { name, email } = req.body;
     const household = await Household.findById(req.params.id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
@@ -174,7 +170,6 @@ app.post('/api/households/:id/members', authMiddleware, async (req, res) => {
 
 app.post('/api/auth/magic-link', async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { email } = req.body;
     const member = await Member.findOne({ email: (email || '').toLowerCase() });
     if (!member) return res.status(404).json({ success: false, error: 'User not found' });
@@ -191,7 +186,6 @@ app.post('/api/auth/magic-link', async (req, res) => {
 
 app.get('/api/auth/verify', async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { token } = req.query;
     if (!token) return res.status(400).json({ success: false, error: 'Missing token' });
     const member = await Member.findOne({ magicToken: token, magicTokenExpires: { $gte: new Date() } });
@@ -219,7 +213,6 @@ app.get('/api/auth/verify', async (req, res) => {
 
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     await Session.deleteOne({ token: req.session.token });
     return res.json({ success: true });
   } catch (err) {
@@ -230,7 +223,6 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
 
 app.get('/api/households/:id/transactions', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { id } = req.params;
     const { weekStart } = req.query;
     if (req.session.householdId.toString() !== id) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -258,7 +250,6 @@ app.get('/api/households/:id/transactions', authMiddleware, async (req, res) => 
 
 app.post('/api/households/:id/transactions', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { id } = req.params;
     const { amount, category, note } = req.body;
     const household = await Household.findById(id);
@@ -296,7 +287,6 @@ app.post('/api/households/:id/transactions', authMiddleware, async (req, res) =>
 
 app.delete('/api/households/:id/transactions/:transactionId', authMiddleware, async (req, res) => {
   try {
-    await connectDB(process.env.MONGODB_URI);
     const { id, transactionId } = req.params;
     const household = await Household.findById(id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
@@ -315,6 +305,15 @@ app.delete('/api/households/:id/transactions/:transactionId', authMiddleware, as
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`API running on port ${port}`);
+
+async function start() {
+  await connectDB(process.env.MONGODB_URI);
+  app.listen(port, () => {
+    console.log(`API running on port ${port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start server', err);
+  process.exit(1);
 });
