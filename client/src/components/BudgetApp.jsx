@@ -168,7 +168,7 @@ const NumericKeypad = ({ value, onChange }) => {
   );
 };
 
-function WelcomeScreen({ onGetStarted }) {
+function WelcomeScreen({ onGetStarted, onMagicLink }) {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
       <div className="w-full max-w-sm text-center">
@@ -178,9 +178,35 @@ function WelcomeScreen({ onGetStarted }) {
         </p>
 
         <Button onClick={onGetStarted} className="w-full mb-4">Get Started</Button>
-        <button className="text-slate-500 hover:text-slate-400 transition-colors text-sm">
-          I have a magic link
+        <button onClick={onMagicLink} className="text-slate-500 hover:text-slate-400 transition-colors text-sm">
+          Get a magic link
         </button>
+      </div>
+    </div>
+  );
+}
+
+function MagicLinkScreen({ email, setEmail, onRequest, onBack, status }) {
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col p-6">
+      <div className="mb-8"><BackButton onClick={onBack} /></div>
+      <div className="flex-1 flex flex-col">
+        <h1 className="text-3xl font-bold text-white mb-2">Get a magic link</h1>
+        <p className="text-slate-400 mb-8">Enter the email you used for your budget.</p>
+        <div className="space-y-4">
+          <Input value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
+        </div>
+        {status === 'sent' && (
+          <div className="mt-6 text-sm text-slate-400">
+            If you have an account, you should receive an email with a magic link shortly.
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="mt-6 text-sm text-red-400">Something went wrong. Please try again.</div>
+        )}
+      </div>
+      <div className="mt-auto pt-6 space-y-4">
+        <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send link</Button>
       </div>
     </div>
   );
@@ -889,6 +915,8 @@ export default function BudgetApp() {
   const [timezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [canInstall, setCanInstall] = useState(false);
+  const [magicEmail, setMagicEmail] = useState('');
+  const [magicStatus, setMagicStatus] = useState('idle');
 
   useEffect(() => {
     const savedHouseholdId = localStorage.getItem('budgetHouseholdId');
@@ -998,7 +1026,26 @@ export default function BudgetApp() {
     setCarryOverSurplus(false);
     setCarryOverDebt(true);
     setSessionToken(null);
+    setMagicEmail('');
+    setMagicStatus('idle');
     setScreen('welcome');
+  };
+
+  const handleMagicLinkRequest = async () => {
+    setMagicStatus('idle');
+    try {
+      await apiRequest('/api/auth/magic-link', {
+        method: 'POST',
+        body: { email: magicEmail.trim() },
+      });
+      setMagicStatus('sent');
+    } catch (err) {
+      if (err.message?.includes('User not found')) {
+        setMagicStatus('sent');
+      } else {
+        setMagicStatus('error');
+      }
+    }
   };
 
   switch (screen) {
@@ -1009,7 +1056,17 @@ export default function BudgetApp() {
         </div>
       );
     case 'welcome':
-      return <WelcomeScreen onGetStarted={() => setScreen('household-name')} />;
+      return <WelcomeScreen onGetStarted={() => setScreen('household-name')} onMagicLink={() => setScreen('magic-link')} />;
+    case 'magic-link':
+      return (
+        <MagicLinkScreen
+          email={magicEmail}
+          setEmail={setMagicEmail}
+          status={magicStatus}
+          onRequest={handleMagicLinkRequest}
+          onBack={() => setScreen('welcome')}
+        />
+      );
     case 'household-name':
       return (
         <HouseholdNameScreen
