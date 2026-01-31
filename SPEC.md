@@ -32,7 +32,7 @@ Welcome and Success screens are not counted in step progress.
 
 4) Weekly budget amount
 - Large numeric display
-- Presets: $300, $400, $500, $600, $750, $1000
+- Presets: $300, $400, $500, $600, $750, $900
 - Default: $500
 
 5) Pick categories
