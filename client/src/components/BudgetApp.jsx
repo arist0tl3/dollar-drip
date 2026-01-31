@@ -506,7 +506,7 @@ function CarryOverScreen({ carryOverSurplus, carryOverDebt, setCarryOverSurplus,
   );
 }
 
-function SuccessScreen({ householdName, membersAdded, onContinue }) {
+function SuccessScreen({ householdName, membersAdded, onContinue, onInstall, canInstall }) {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-center p-8">
       <div className="max-w-sm">
@@ -515,6 +515,11 @@ function SuccessScreen({ householdName, membersAdded, onContinue }) {
           <span className="text-white font-semibold">{householdName}</span> is ready.
           {membersAdded > 0 && ' Magic links sent to your members.'}
         </p>
+        {canInstall && (
+          <Button onClick={onInstall} variant="secondary" className="w-full mb-3">
+            Install app
+          </Button>
+        )}
         <Button onClick={onContinue} className="w-full">Go to tracker</Button>
       </div>
     </div>
@@ -882,6 +887,8 @@ export default function BudgetApp() {
   const [carryOverSurplus, setCarryOverSurplus] = useState(false);
   const [carryOverDebt, setCarryOverDebt] = useState(true);
   const [timezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [canInstall, setCanInstall] = useState(false);
 
   useEffect(() => {
     const savedHouseholdId = localStorage.getItem('budgetHouseholdId');
@@ -908,6 +915,38 @@ export default function BudgetApp() {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   }, []);
+
+  useEffect(() => {
+    const handleBeforeInstall = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+      setCanInstall(true);
+    };
+
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      setCanInstall(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    try {
+      await installPrompt.userChoice;
+    } finally {
+      setInstallPrompt(null);
+      setCanInstall(false);
+    }
+  };
 
   const persistSession = (householdId, memberId, token) => {
     localStorage.setItem('budgetHouseholdId', householdId);
@@ -1050,6 +1089,8 @@ export default function BudgetApp() {
         <SuccessScreen
           householdName={household?.name || householdName || 'Your budget'}
           membersAdded={members.length}
+          canInstall={canInstall}
+          onInstall={handleInstall}
           onContinue={() => setScreen('tracker')}
         />
       );

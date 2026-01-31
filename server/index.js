@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import postmark from 'postmark';
 import { connectDB } from './db.js';
 import Household from './models/Household.js';
 import Member from './models/Member.js';
@@ -187,7 +188,28 @@ app.post('/api/auth/magic-link', async (req, res) => {
     member.magicToken = token;
     member.magicTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await member.save();
-    return res.json({ success: true, message: 'Magic link generated', token });
+    const household = await Household.findById(member.householdId);
+    const appUrl = process.env.APP_URL || 'http://localhost:4321';
+    const link = `${appUrl}/join?token=${token}`;
+
+    const postmarkToken = process.env.POSTMARK_API_TOKEN;
+    const postmarkFrom = process.env.POSTMARK_FROM;
+    const postmarkStream = process.env.POSTMARK_MESSAGE_STREAM || 'outbound';
+    if (!postmarkToken || !postmarkFrom) {
+      return res.status(500).json({ success: false, error: 'Email service not configured' });
+    }
+
+    const client = new postmark.ServerClient(postmarkToken);
+    await client.sendEmail({
+      From: postmarkFrom,
+      To: member.email,
+      Subject: `Your magic link for ${household?.name || 'Weekly Budget'}`,
+      HtmlBody: `<p>Click to sign in:</p><p><a href="${link}">${link}</a></p><p>This link expires in 24 hours.</p>`,
+      TextBody: `Sign in: ${link}\n\nThis link expires in 24 hours.`,
+      MessageStream: postmarkStream,
+    });
+
+    return res.json({ success: true, message: 'Magic link sent' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: 'Failed to create magic link' });
