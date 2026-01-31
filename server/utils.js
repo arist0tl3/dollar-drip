@@ -4,7 +4,9 @@ export function getWeekStart(timezone = 'UTC', resetDay = 1) {
   const now = new Date();
   const localDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
   const day = localDate.getDay();
-  const diff = localDate.getDate() - ((day - resetDay + 7) % 7);
+  const normalizedResetDay =
+    Number.isInteger(resetDay) && resetDay >= 0 && resetDay <= 6 ? resetDay : 1;
+  const diff = localDate.getDate() - ((day - normalizedResetDay + 7) % 7);
   const start = new Date(localDate.setDate(diff));
   start.setHours(0, 0, 0, 0);
   return start;

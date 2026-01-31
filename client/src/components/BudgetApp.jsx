@@ -564,10 +564,18 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const weekStart = getWeekStart(household.timezone || 'UTC', household.resetDay || 1).toISOString();
+  const normalizedResetDay =
+    Number.isInteger(household.resetDay) && household.resetDay >= 0 && household.resetDay <= 6
+      ? household.resetDay
+      : 1;
+  const weekStart = getWeekStart(household.timezone || 'UTC', normalizedResetDay).toISOString();
 
   const weeklyTransactions = useMemo(
-    () => transactions.filter((t) => t.weekStart === weekStart && !t.deletedAt),
+    () =>
+      transactions.filter((t) => {
+        const txWeek = t.weekStart ? new Date(t.weekStart).toISOString() : '';
+        return txWeek === weekStart && !t.deletedAt;
+      }),
     [transactions, weekStart]
   );
 
@@ -593,8 +601,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
       }
     };
     fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+    return undefined;
   }, [household._id, sessionToken]);
 
   const handleSubmit = async () => {
@@ -731,7 +738,9 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         <button onClick={onOpenSettings} className="text-slate-400 hover:text-white transition-colors text-sm font-medium">
           {household.name}
         </button>
-        <div className="text-sm text-slate-500">Resets in {getDaysUntilReset(household.timezone, household.resetDay)}d</div>
+        <div className="text-sm text-slate-500">
+          Resets in {getDaysUntilReset(household.timezone, normalizedResetDay)}d
+        </div>
         <button
           onClick={() => setShowHistory(true)}
           className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
