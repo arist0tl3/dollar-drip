@@ -563,12 +563,14 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const [justLogged, setJustLogged] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [serverWeekStart, setServerWeekStart] = useState(null);
 
   const normalizedResetDay =
     Number.isInteger(household.resetDay) && household.resetDay >= 0 && household.resetDay <= 6
       ? household.resetDay
       : 1;
-  const weekStart = getWeekStart(household.timezone || 'UTC', normalizedResetDay).toISOString();
+  const weekStart =
+    serverWeekStart || getWeekStart(household.timezone || 'UTC', normalizedResetDay).toISOString();
 
   const weeklyTransactions = useMemo(
     () =>
@@ -594,6 +596,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
           token: sessionToken,
         });
         setTransactions(res.transactions || []);
+        if (res.weekStart) setServerWeekStart(res.weekStart);
       } catch (err) {
         setError(err.message || 'Could not load transactions');
       } finally {
