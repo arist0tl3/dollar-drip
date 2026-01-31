@@ -19,14 +19,6 @@ app.use(
   })
 );
 
-const DEFAULT_CATEGORIES = [
-  { id: 'groceries', label: 'Groceries', icon: '🛒', color: 'bg-green-500' },
-  { id: 'dining', label: 'Dining', icon: '🍽️', color: 'bg-orange-500' },
-  { id: 'drinks', label: 'Drinks', icon: '🍺', color: 'bg-amber-500' },
-  { id: 'gas', label: 'Gas', icon: '⛽', color: 'bg-blue-500' },
-  { id: 'other', label: 'Other', icon: '💳', color: 'bg-purple-500' },
-];
-
 async function authMiddleware(req, res, next) {
   const auth = req.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
@@ -58,17 +50,31 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.post('/api/households', async (req, res) => {
   try {
-    const { name, weeklyBudget, timezone = 'UTC', owner, members = [] } = req.body;
+    const {
+      name,
+      weeklyBudget,
+      timezone = 'UTC',
+      resetDay = 1,
+      favoriteCategoryIds = [],
+      carryOverSurplus = false,
+      carryOverDebt = true,
+      owner,
+      members = [],
+    } = req.body;
     if (!name || !owner?.email || !owner?.name || !weeklyBudget) {
       return res.status(400).json({ success: false, error: 'Missing fields' });
     }
     const ownerEmail = (owner.email || '').toLowerCase();
+    const normalizedResetDay = Number.isInteger(resetDay) && resetDay >= 0 && resetDay <= 6 ? resetDay : 1;
 
     const household = await Household.create({
       name,
       weeklyBudget,
       timezone,
-      categories: DEFAULT_CATEGORIES,
+      resetDay: normalizedResetDay,
+      favoriteCategoryIds,
+      carryOverSurplus: !!carryOverSurplus,
+      carryOverDebt: !!carryOverDebt,
     });
 
     const ownerDoc = await Member.create({
@@ -128,12 +134,16 @@ app.get('/api/households/:id', authMiddleware, async (req, res) => {
 
 app.patch('/api/households/:id', authMiddleware, async (req, res) => {
   try {
-    const { weeklyBudget, timezone } = req.body;
+    const { weeklyBudget, timezone, resetDay, favoriteCategoryIds, carryOverSurplus, carryOverDebt } = req.body;
     const household = await Household.findById(req.params.id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
     if (!household._id.equals(req.session.householdId)) return res.status(403).json({ success: false, error: 'Forbidden' });
     if (weeklyBudget) household.weeklyBudget = weeklyBudget;
     if (timezone) household.timezone = timezone;
+    if (Number.isInteger(resetDay) && resetDay >= 0 && resetDay <= 6) household.resetDay = resetDay;
+    if (Array.isArray(favoriteCategoryIds)) household.favoriteCategoryIds = favoriteCategoryIds;
+    if (typeof carryOverSurplus === 'boolean') household.carryOverSurplus = carryOverSurplus;
+    if (typeof carryOverDebt === 'boolean') household.carryOverDebt = carryOverDebt;
     await household.save();
     const members = await Member.find({ householdId: household._id });
     return res.json({ success: true, household: sanitizeHousehold(household, members) });
@@ -232,7 +242,7 @@ app.get('/api/households/:id/transactions', authMiddleware, async (req, res) => 
     }
     const transactions = await Transaction.find(filter).sort({ createdAt: -1 });
     const household = await Household.findById(id);
-    const currentWeekStart = getWeekStart(household.timezone).toISOString();
+    const currentWeekStart = getWeekStart(household.timezone, household.resetDay).toISOString();
     const weekly = transactions.filter((t) => t.weekStart.toISOString() === currentWeekStart);
     const totalSpent = weekly.reduce((sum, t) => sum + t.amount, 0);
     return res.json({
@@ -255,21 +265,23 @@ app.post('/api/households/:id/transactions', authMiddleware, async (req, res) =>
     const household = await Household.findById(id);
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
     if (!household._id.equals(req.session.householdId)) return res.status(403).json({ success: false, error: 'Forbidden' });
-    if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Invalid amount' });
-    const weekStart = getWeekStart(household.timezone);
+    const parsedAmount = Number(amount);
+    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid amount' });
+    }
+    const weekStart = getWeekStart(household.timezone, household.resetDay);
 
     const transaction = await Transaction.create({
       householdId: household._id,
       memberId: req.member._id,
       memberName: req.member.name,
-      amount,
+      amount: parsedAmount,
       category,
       note,
       weekStart,
       deletedAt: null,
     });
 
-    const currentWeekStart = weekStart.toISOString();
     const weeklyTransactions = await Transaction.find({ householdId: household._id, weekStart, deletedAt: null });
     const totalSpent = weeklyTransactions.reduce((sum, t) => sum + t.amount, 0);
 

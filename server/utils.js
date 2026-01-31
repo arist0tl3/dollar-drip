@@ -1,13 +1,13 @@
 import crypto from 'crypto';
 
-export function getWeekStart(timezone = 'UTC') {
+export function getWeekStart(timezone = 'UTC', resetDay = 1) {
   const now = new Date();
   const localDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
   const day = localDate.getDay();
-  const diff = localDate.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(localDate.setDate(diff));
-  monday.setHours(0, 0, 0, 0);
-  return monday;
+  const diff = localDate.getDate() - ((day - resetDay + 7) % 7);
+  const start = new Date(localDate.setDate(diff));
+  start.setHours(0, 0, 0, 0);
+  return start;
 }
 
 export function randomToken() {

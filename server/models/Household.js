@@ -1,19 +1,14 @@
 import mongoose from 'mongoose';
 
-const CategorySchema = new mongoose.Schema({
-  id: String,
-  label: String,
-  icon: String,
-  color: String,
-});
-
 const HouseholdSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     weeklyBudget: { type: Number, required: true },
-    resetDay: { type: String, default: 'monday' },
+    resetDay: { type: Number, default: 1 },
     timezone: { type: String, default: 'UTC' },
-    categories: { type: [CategorySchema], default: [] },
+    favoriteCategoryIds: { type: [String], default: [] },
+    carryOverSurplus: { type: Boolean, default: false },
+    carryOverDebt: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

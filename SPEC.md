@@ -1,43 +1,97 @@
-# Weekly Budget Tracker Spec (Updated)
+# Weekly Budget App - Design Specification
+Version 2.0 | January 2026
 
-This spec reflects the current codebase. It separates what is already implemented from remaining work.
+## Overview
+Weekly Budget is a simple, fast expense tracker for households (individuals, couples, roommates, families). The core value is friction at the right moment: a quick gut-check before swiping a card.
 
-## Completed
+## Design principles
+- Speed is everything. Logging an expense should take seconds.
+- The number is the hero. Remaining budget is the primary element.
+- Opinionated defaults with one-tap overrides.
+- No visual clutter. Category icons are functional; decorative emojis are not used elsewhere.
 
-### Core product
-- Shared household budget with members and a weekly budget reset.
-- Expense logging with category and optional note.
-- Soft delete for transactions.
-- Sessions persist until explicit logout.
+## Technical stack
+- Frontend: Astro + React + Tailwind CSS
+- Deployment: PWA
+- Authentication: Magic links (passwordless)
 
-### Frontend
-- Astro + React UI with onboarding flow and main tracker UI.
-- History and settings views implemented as UI states in the client app.
-- Polling every 10 seconds for transaction refresh.
-- PWA setup (manifest, icons, service worker) and offline fallback page.
+## Onboarding flow (7 steps)
+Welcome and Success screens are not counted in step progress.
 
-### Backend
-- Express API with MongoDB (Mongoose) models for Household, Member, Transaction, Session.
-- Household endpoints: create, fetch, update.
-- Member invite endpoint (creates member with magic token and returns invite link).
-- Auth endpoints: magic link generation, verify, logout.
-- Transaction endpoints: list, create, soft delete.
-- Week-start calculation by timezone.
+1) Name your budget
+- Single text input
+- Continue disabled until input has content
 
-## Todos
+2) Add yourself
+- Name + email
+- Both required
 
-### Frontend
-- Add a magic-link join flow and `/join` landing route.
-- Wire the "I have a magic link" button to the join flow.
-- Implement poll-on-focus refresh (in addition to interval polling).
-- Consider splitting settings/history into routes if desired.
+3) Invite others (optional)
+- Add member cards with remove
+- "Skip for now" if none
 
-### Backend
-- Send magic-link emails via Resend (currently returns token only).
-- Align `GET /api/households/:id/transactions` with `weekStart` parameter (return that week only and compute totals for that week).
+4) Weekly budget amount
+- Large numeric display
+- Presets: $300, $400, $500, $600, $750, $1000
+- Default: $500
 
-### PWA / Offline
-- Add offline queue for writes (transactions) and sync on reconnect.
+5) Pick categories
+- Grid of 20 categories (4 columns)
+- Select up to 6 favorites
+- Counter: "x/6"
+- Default favorites: Groceries, Dining, Coffee, Gas
 
-### Ops / Docs
-- Confirm environment variable names across frontend and backend.
+6) Reset day
+- Pick one of 7 days
+- Default: Monday
+
+7) Carry-over rules
+- Under budget: Roll it over / Start fresh (default: Start fresh)
+- Over budget: Subtract it / Start fresh (default: Subtract it)
+
+## Main tracker
+- Header: household name (settings), reset countdown, history link
+- Budget hero: remaining amount + color status
+  - Green: >50% remaining
+  - Yellow: 25-50% remaining
+  - Red: <25% remaining
+- Progress bar matches status color
+- Numeric keypad input (whole dollars only)
+  - 3x4 grid: 1-9, Clear, 0, Backspace
+  - Max 5 digits ($99,999)
+- Note field hidden by default; shown via "+ Add a note"
+- Category grid: 3 columns of 6 favorites
+- "More categories" opens full list
+- Log button enabled only when amount > 0 and category selected
+
+## History
+- Newest first
+- Category icon, amount, user, time, optional note
+- Delete button per entry
+
+## Visual design
+- Background: slate-950
+- Surfaces: slate-900
+- Interactives: slate-800
+- Primary: emerald-500
+- Warning: yellow-500
+- Danger: red-500
+- Typography: system fonts; budget amount is the largest element
+- Spacing: p-6, rounded-2xl/3xl cards, rounded-xl inputs
+
+## Data model updates
+- Household:
+  - resetDay (0-6)
+  - favoriteCategoryIds (array of strings)
+  - carryOverSurplus (boolean)
+  - carryOverDebt (boolean)
+
+## Validation rules
+- Transaction amount must be a positive whole dollar integer.
+
+## Future considerations
+- Settings screen for household config changes
+- Week-over-week history
+- Category breakdown visualization
+- Push notifications
+- Edit existing transactions
