@@ -142,7 +142,7 @@ const NumericKeypad = ({ value, onChange }) => {
   const KeypadButton = ({ children, onClick, className = '' }) => (
     <button
       onClick={onClick}
-      className={`h-14 rounded-xl text-xl font-semibold transition-all active:scale-95 ${className}`}
+      className={`h-12 sm:h-14 rounded-xl text-xl font-semibold transition-all active:scale-95 ${className}`}
     >
       {children}
     </button>
@@ -552,7 +552,7 @@ function SuccessScreen({ householdName, membersAdded, onContinue, onInstall, can
   );
 }
 
-function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, onRefreshHousehold }) {
+function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, onLogout, onRefreshHousehold, canInstall, onInstall }) {
   const [transactions, setTransactions] = useState([]);
   const [amount, setAmount] = useState('0');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -560,10 +560,14 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [justLogged, setJustLogged] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [serverWeekStart, setServerWeekStart] = useState(null);
+  const [showInstallHint, setShowInstallHint] = useState(false);
+  const [installHintText, setInstallHintText] = useState('');
 
   const normalizedResetDay =
     Number.isInteger(household.resetDay) && household.resetDay >= 0 && household.resetDay <= 6
@@ -587,6 +591,50 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
 
   const favoriteIds = household.favoriteCategoryIds?.length ? household.favoriteCategoryIds : DEFAULT_FAVORITES;
   const favoriteCategories = ALL_CATEGORIES.filter((cat) => favoriteIds.includes(cat.id));
+
+  const dailyTotals = useMemo(() => {
+    const startDate = new Date(weekStart);
+    const days = Array.from({ length: 7 }).map((_, i) => {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      return { date, total: 0 };
+    });
+
+    weeklyTransactions.forEach((tx) => {
+      const txDate = new Date(tx.createdAt);
+      const index = days.findIndex((d) => d.date.toDateString() === txDate.toDateString());
+      if (index >= 0) days[index].total += tx.amount;
+    });
+
+    const max = Math.max(...days.map((d) => d.total), 1);
+    return { days, max };
+  }, [weeklyTransactions, weekStart]);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.navigator.standalone === true;
+    if (standalone) {
+      setShowInstallHint(false);
+      return;
+    }
+
+    const ua = navigator.userAgent || '';
+    const isiOS = /iphone|ipad|ipod/i.test(ua);
+    const isAndroid = /android/i.test(ua);
+    const hint = isiOS
+      ? 'Install this app: tap Share, then “Add to Home Screen.”'
+      : isAndroid
+      ? 'Install this app from your browser menu.'
+      : 'Install this app from your browser menu.';
+
+    const lastDismissed = Number(localStorage.getItem('budgetInstallHintDismissedAt') || '0');
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    if (!lastDismissed || Date.now() - lastDismissed > thirtyDays) {
+      setInstallHintText(hint);
+      setShowInstallHint(true);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -627,6 +675,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
       setSelectedCategory(null);
       setNote('');
       setShowNoteInput(false);
+      setShowAddExpense(false);
       setJustLogged(true);
       setTimeout(() => setJustLogged(false), 1500);
       onRefreshHousehold(res.household);
@@ -651,6 +700,11 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const budgetColor = percentRemaining > 50 ? 'text-emerald-500' : percentRemaining > 25 ? 'text-yellow-500' : 'text-red-500';
   const barColor = percentRemaining > 50 ? 'bg-emerald-500' : percentRemaining > 25 ? 'bg-yellow-500' : 'bg-red-500';
 
+  const handleDismissHint = () => {
+    localStorage.setItem('budgetInstallHintDismissedAt', Date.now().toString());
+    setShowInstallHint(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -667,8 +721,8 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
           <h1 className="font-semibold">All Categories</h1>
           <div className="w-12" />
         </div>
-        <div className="flex-1 px-5 py-4 overflow-y-auto">
-          <div className="grid grid-cols-3 gap-2.5">
+        <div className="flex-1 px-5 py-4">
+          <div className="grid grid-cols-3 grid-rows-7 gap-2 h-full">
             {ALL_CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
@@ -676,12 +730,12 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
                   setSelectedCategory(cat.id);
                   setShowAllCategories(false);
                 }}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl transition-all active:scale-95 ${
+                className={`flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 ${
                   selectedCategory === cat.id ? 'bg-emerald-500/20 ring-2 ring-emerald-500' : 'bg-slate-900 hover:bg-slate-800'
                 }`}
               >
-                <span className="text-2xl mb-1">{cat.icon}</span>
-                <span className="text-xs font-medium text-slate-400">{cat.label}</span>
+                <span className="text-lg sm:text-xl mb-0.5">{cat.icon}</span>
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-400">{cat.label}</span>
               </button>
             ))}
           </div>
@@ -744,15 +798,65 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         <div className="text-sm text-slate-500">
           Resets in {getDaysUntilReset(household.timezone, normalizedResetDay)}d
         </div>
-        <button
-          onClick={() => setShowHistory(true)}
-          className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
-        >
-          History
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu((prev) => !prev)}
+            className="w-9 h-9 rounded-full bg-slate-900 text-sm font-semibold text-slate-200 flex items-center justify-center"
+          >
+            {(currentUser?.name || 'U').slice(0, 1).toUpperCase()}
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-slate-900 border border-slate-800 shadow-lg z-10">
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowHistory(true);
+                }}
+                className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800 rounded-t-xl"
+              >
+                History
+              </button>
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  onOpenSettings();
+                }}
+                className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-800"
+              >
+                Settings
+              </button>
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  onLogout();
+                }}
+                className="w-full text-left px-4 py-3 text-sm text-red-300 hover:bg-slate-800 rounded-b-xl"
+              >
+                Log out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="px-5 py-4 text-center">
+      {showInstallHint && (
+        <div className="mx-5 mt-4 rounded-2xl bg-slate-900 border border-slate-800 p-4 text-sm text-slate-300">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-white font-medium mb-1">Install Weekly Budget</div>
+              <div className="text-slate-400">{installHintText}</div>
+            </div>
+            <button onClick={handleDismissHint} className="text-slate-500 hover:text-slate-300 text-lg leading-none">×</button>
+          </div>
+          {canInstall && (
+            <button onClick={onInstall} className="mt-3 text-emerald-400 hover:text-emerald-300 text-sm font-semibold">
+              Install now
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="px-5 py-6 text-center">
         <div className="text-sm text-slate-500 mb-1">Remaining this week</div>
         <div className={`text-5xl font-extrabold mb-1 transition-all duration-300 ${budgetColor} ${justLogged ? 'scale-95' : 'scale-100'}`}>
           {formatCurrency(remaining)}
@@ -763,59 +867,91 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         </div>
       </div>
 
-      <div className="flex-1 px-5 pb-6 flex flex-col">
-        <div className="text-center mb-4">
-          <div className="text-4xl font-bold">
-            <span className="text-slate-500">$</span>
-            <span>{amount}</span>
+      <div className="px-5 pb-6 flex-1 flex flex-col">
+        <div className="bg-slate-900 rounded-2xl p-4 mb-5">
+          <div className="min-h-[48px]">
+            <div className="text-sm text-slate-500">This week</div>
+          </div>
+          <div className="flex items-end gap-2 h-20">
+            {dailyTotals.days.map((day) => {
+              const height = Math.max(6, Math.round((day.total / dailyTotals.max) * 72));
+              return (
+                <div key={day.date.toISOString()} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="w-full bg-emerald-500/60 rounded-lg mt-3" style={{ height }} />
+                  <div className="text-[10px] text-slate-500">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mb-4">
-          <NumericKeypad value={amount} onChange={setAmount} />
-        </div>
-
-        {showNoteInput ? (
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Add a note..."
-            autoFocus
-            className="w-full bg-slate-900 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 mb-4"
-          />
-        ) : (
-          <button onClick={() => setShowNoteInput(true)} className="text-sm text-slate-500 hover:text-slate-400 mb-4">
-            + Add a note
-          </button>
-        )}
-
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {favoriteCategories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all active:scale-95 ${
-                selectedCategory === cat.id ? 'bg-emerald-500/20 ring-2 ring-emerald-500' : 'bg-slate-900 hover:bg-slate-800'
-              }`}
-            >
-              <span className="text-2xl mb-1">{cat.icon}</span>
-              <span className="text-xs font-medium text-slate-400">{cat.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setShowAllCategories(true)}
-          className="w-full text-center text-sm text-slate-500 hover:text-slate-400 transition-colors mb-4 py-1"
-        >
-          More categories →
-        </button>
-
-        <Button onClick={handleSubmit} disabled={parseInt(amount, 10) <= 0 || !selectedCategory} className="w-full mt-auto">
-          {justLogged ? '✓ Logged!' : 'Log Expense'}
+        <Button onClick={() => setShowAddExpense(true)} className="w-full mt-auto">
+          Add expense
         </Button>
       </div>
+
+      {showAddExpense && (
+        <div className="fixed inset-0 bg-slate-950 z-20 flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/50">
+            <BackButton onClick={() => setShowAddExpense(false)} />
+            <h1 className="font-semibold">Add expense</h1>
+            <div className="w-12" />
+          </div>
+          <div className="flex-1 px-5 py-4 flex flex-col">
+            <div className="text-center mb-3">
+              <div className="text-4xl font-bold">
+                <span className="text-slate-500">$</span>
+                <span>{amount}</span>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <NumericKeypad value={amount} onChange={setAmount} />
+            </div>
+
+            {showNoteInput ? (
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Add a note..."
+                autoFocus
+                className="w-full bg-slate-900 rounded-xl px-4 py-3 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 mb-3"
+              />
+            ) : (
+              <button onClick={() => setShowNoteInput(true)} className="text-sm text-slate-500 hover:text-slate-400 mb-3">
+                + Add a note
+              </button>
+            )}
+
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {favoriteCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all active:scale-95 ${
+                    selectedCategory === cat.id ? 'bg-emerald-500/20 ring-2 ring-emerald-500' : 'bg-slate-900 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-lg sm:text-xl mb-0.5">{cat.icon}</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-slate-400">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowAllCategories(true)}
+              className="w-full text-center text-sm text-slate-500 hover:text-slate-400 transition-colors mb-3 py-1"
+            >
+              More categories →
+            </button>
+
+            <Button onClick={handleSubmit} disabled={parseInt(amount, 10) <= 0 || !selectedCategory} className="w-full mt-auto">
+              {justLogged ? '✓ Logged!' : 'Add expense'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1170,7 +1306,10 @@ export default function BudgetApp() {
           currentUser={currentUser}
           sessionToken={sessionToken}
           onOpenSettings={() => setScreen('settings')}
+          onLogout={handleLogout}
           onRefreshHousehold={(updated) => setHousehold(updated || household)}
+          canInstall={canInstall}
+          onInstall={handleInstall}
         />
       );
     case 'settings':
