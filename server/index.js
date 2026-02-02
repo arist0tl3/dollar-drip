@@ -203,7 +203,7 @@ app.post('/api/auth/magic-link', async (req, res) => {
     await client.sendEmail({
       From: postmarkFrom,
       To: member.email,
-      Subject: `Your magic link for ${household?.name || 'Weekly Budget'}`,
+      Subject: `Your magic link for ${household?.name || 'Dollar Drip'}`,
       HtmlBody: `<p>Click to sign in:</p><p><a href="${link}">${link}</a></p><p>This link expires in 24 hours.</p>`,
       TextBody: `Sign in: ${link}\n\nThis link expires in 24 hours.`,
       MessageStream: postmarkStream,

@@ -1,6 +1,6 @@
-# Weekly Budget Tracker
+# Dollar Drip
 
-A shared household budget tracker that lets multiple people log weekly expenses against a budget that resets every Monday in the household's timezone. Designed as a mobile-first PWA.
+A shared household budget tracker that lets multiple people log weekly expenses against a budget that resets every week in the household's timezone. Designed as a mobile-first PWA.
 
 ## What it is
 - Shared household budget with members and weekly reset

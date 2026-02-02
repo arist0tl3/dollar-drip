@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maskable icons need content within the safe zone (center 80%) -->
+  <!-- Safe zone is ~410px centered, so we add padding -->
+  <rect width="512" height="512" fill="#10b981"/>
+  <path d="M256 102.4C256 102.4 140.8 217.6 140.8 307.2C140.8 370.77 192.43 422.4 256 422.4C319.57 422.4 371.2 370.77 371.2 307.2C371.2 217.6 256 102.4 256 102.4Z" fill="white" fill-opacity="0.95"/>
+  <text x="256" y="340" text-anchor="middle" fill="#059669" font-size="140" font-weight="bold" font-family="system-ui, -apple-system, sans-serif">$</text>
+</svg>

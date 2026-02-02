@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budget-v1';
+const CACHE_NAME = 'dollar-drip-v1';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE = ['/', '/app', OFFLINE_URL, '/manifest.webmanifest', '/icons/icon-192.png'];
 
