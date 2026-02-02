@@ -181,16 +181,29 @@ app.post('/api/households/:id/members', authMiddleware, async (req, res) => {
 
 app.post('/api/auth/magic-link', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, mode } = req.body;
     const member = await Member.findOne({ email: (email || '').toLowerCase() });
     if (!member) return res.status(404).json({ success: false, error: 'User not found' });
-    const token = crypto.randomBytes(32).toString('hex');
-    member.magicToken = token;
-    member.magicTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const isPwa = mode === 'pwa';
+    let token = null;
+    let otpCode = null;
+
+    if (isPwa) {
+      otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
+      member.otpHash = otpHash;
+      member.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      member.otpAttempts = 0;
+    } else {
+      token = crypto.randomBytes(32).toString('hex');
+      member.magicToken = token;
+      member.magicTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+
     await member.save();
     const household = await Household.findById(member.householdId);
     const appUrl = process.env.APP_URL || 'http://localhost:4321';
-    const link = `${appUrl}/join?token=${token}`;
+    const link = token ? `${appUrl}/join?token=${token}` : null;
 
     const postmarkToken = process.env.POSTMARK_API_TOKEN;
     const postmarkFrom = process.env.POSTMARK_FROM;
@@ -200,6 +213,18 @@ app.post('/api/auth/magic-link', async (req, res) => {
     }
 
     const client = new postmark.ServerClient(postmarkToken);
+    if (isPwa && otpCode) {
+      await client.sendEmail({
+        From: postmarkFrom,
+        To: member.email,
+        Subject: `Your login code for ${household?.name || 'Dollar Drip'}`,
+        HtmlBody: `<p>Your one-time code:</p><p style="font-size:24px;font-weight:bold;letter-spacing:2px;">${otpCode}</p><p>This code expires in 10 minutes.</p>`,
+        TextBody: `Your one-time code: ${otpCode}\n\nThis code expires in 10 minutes.`,
+        MessageStream: postmarkStream,
+      });
+      return res.json({ success: true, message: 'OTP sent' });
+    }
+
     await client.sendEmail({
       From: postmarkFrom,
       To: member.email,
@@ -213,6 +238,53 @@ app.post('/api/auth/magic-link', async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: 'Failed to create magic link' });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ success: false, error: 'Missing fields' });
+    const member = await Member.findOne({ email: email.toLowerCase() });
+    if (!member || !member.otpHash || !member.otpExpires) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired code' });
+    }
+    if (member.otpAttempts >= 5) {
+      return res.status(429).json({ success: false, error: 'Too many attempts' });
+    }
+    if (member.otpExpires < new Date()) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired code' });
+    }
+    const otpHash = crypto.createHash('sha256').update(code).digest('hex');
+    if (otpHash !== member.otpHash) {
+      member.otpAttempts += 1;
+      await member.save();
+      return res.status(400).json({ success: false, error: 'Invalid or expired code' });
+    }
+
+    member.otpHash = null;
+    member.otpExpires = null;
+    member.otpAttempts = 0;
+    await member.save();
+
+    const sessionToken = randomToken();
+    const session = await Session.create({
+      memberId: member._id,
+      householdId: member.householdId,
+      token: sessionToken,
+    });
+    const household = await Household.findById(member.householdId);
+    return res.json({
+      success: true,
+      session: {
+        token: session.token,
+        member: { id: member._id, name: member.name, email: member.email },
+        household: { id: household._id, name: household.name, weeklyBudget: household.weeklyBudget },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Failed to verify code' });
   }
 });
 

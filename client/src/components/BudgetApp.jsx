@@ -186,7 +186,7 @@ function WelcomeScreen({ onGetStarted, onMagicLink }) {
   );
 }
 
-function MagicLinkScreen({ email, setEmail, onRequest, onBack, status }) {
+function MagicLinkScreen({ email, setEmail, onRequest, onBack, status, isPwa, otpCode, setOtpCode, onVerify }) {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col p-6">
       <div className="mb-8"><BackButton onClick={onBack} /></div>
@@ -196,9 +196,17 @@ function MagicLinkScreen({ email, setEmail, onRequest, onBack, status }) {
         <div className="space-y-4">
           <Input value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
         </div>
-        {status === 'sent' && (
+        {status === 'sent' && !isPwa && (
           <div className="mt-6 text-sm text-slate-400">
             If you have an account, you should receive an email with a magic link shortly.
+          </div>
+        )}
+        {status === 'sent' && isPwa && (
+          <div className="mt-6 space-y-3">
+            <div className="text-sm text-slate-400">
+              We sent a one-time code. Enter it below to sign in.
+            </div>
+            <Input value={otpCode} onChange={setOtpCode} placeholder="6-digit code" type="text" />
           </div>
         )}
         {status === 'error' && (
@@ -207,6 +215,11 @@ function MagicLinkScreen({ email, setEmail, onRequest, onBack, status }) {
       </div>
       <div className="mt-auto pt-6 space-y-4">
         <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send link</Button>
+        {status === 'sent' && isPwa && (
+          <Button onClick={onVerify} disabled={otpCode.trim().length !== 6} className="w-full" variant="secondary">
+            Verify code
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -1065,6 +1078,8 @@ export default function BudgetApp() {
   const [canInstall, setCanInstall] = useState(false);
   const [magicEmail, setMagicEmail] = useState('');
   const [magicStatus, setMagicStatus] = useState('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
     const savedHouseholdId = localStorage.getItem('budgetHouseholdId');
@@ -1090,6 +1105,13 @@ export default function BudgetApp() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+  }, []);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.navigator.standalone === true;
+    setIsStandalone(standalone);
   }, []);
 
   useEffect(() => {
@@ -1176,6 +1198,7 @@ export default function BudgetApp() {
     setSessionToken(null);
     setMagicEmail('');
     setMagicStatus('idle');
+    setOtpCode('');
     setScreen('welcome');
   };
 
@@ -1184,7 +1207,7 @@ export default function BudgetApp() {
     try {
       await apiRequest('/api/auth/magic-link', {
         method: 'POST',
-        body: { email: magicEmail.trim() },
+        body: { email: magicEmail.trim(), mode: isStandalone ? 'pwa' : 'web' },
       });
       setMagicStatus('sent');
     } catch (err) {
@@ -1193,6 +1216,25 @@ export default function BudgetApp() {
       } else {
         setMagicStatus('error');
       }
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    try {
+      const res = await apiRequest('/api/auth/verify-otp', {
+        method: 'POST',
+        body: { email: magicEmail.trim(), code: otpCode.trim() },
+      });
+      if (res.session?.token && res.session?.member?.id && res.session?.household?.id) {
+        localStorage.setItem('budgetSessionToken', res.session.token);
+        localStorage.setItem('budgetCurrentUserId', res.session.member.id);
+        localStorage.setItem('budgetHouseholdId', res.session.household.id);
+        setScreen('tracker');
+      } else {
+        setMagicStatus('error');
+      }
+    } catch (err) {
+      setMagicStatus('error');
     }
   };
 
@@ -1211,7 +1253,11 @@ export default function BudgetApp() {
           email={magicEmail}
           setEmail={setMagicEmail}
           status={magicStatus}
+          isPwa={isStandalone}
+          otpCode={otpCode}
+          setOtpCode={setOtpCode}
           onRequest={handleMagicLinkRequest}
+          onVerify={handleVerifyOtp}
           onBack={() => setScreen('welcome')}
         />
       );

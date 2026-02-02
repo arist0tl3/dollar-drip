@@ -8,6 +8,9 @@ const MemberSchema = new mongoose.Schema(
     role: { type: String, enum: ['owner', 'member'], default: 'member' },
     magicToken: String,
     magicTokenExpires: Date,
+    otpHash: String,
+    otpExpires: Date,
+    otpAttempts: { type: Number, default: 0 },
     lastActiveAt: Date,
   },
   { timestamps: { createdAt: true, updatedAt: false } }
