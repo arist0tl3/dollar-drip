@@ -1,8 +1,8 @@
-# Weekly Budget App - Design Specification
+# Dollar Drip - Design Specification
 Version 2.0 | January 2026
 
 ## Overview
-Weekly Budget is a simple, fast expense tracker for households (individuals, couples, roommates, families). The core value is friction at the right moment: a quick gut-check before swiping a card.
+Dollar Drip is a simple, fast expense tracker for households (individuals, couples, roommates, families). The core value is friction at the right moment: a quick gut-check before swiping a card.
 
 ## Design principles
 - Speed is everything. Logging an expense should take seconds.

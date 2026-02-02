@@ -1,0 +1,5 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="180" fill="#10b981"/>
+  <path d="M90 27C90 27 40.5 76.5 40.5 112.5C40.5 139.85 62.65 162 90 162C117.35 162 139.5 139.85 139.5 112.5C139.5 76.5 90 27 90 27Z" fill="white" fill-opacity="0.95"/>
+  <text x="90" y="126" text-anchor="middle" fill="#059669" font-size="58" font-weight="bold" font-family="system-ui, -apple-system, sans-serif">$</text>
+</svg>

@@ -172,7 +172,7 @@ function WelcomeScreen({ onGetStarted, onMagicLink }) {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
       <div className="w-full max-w-sm text-center">
-        <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">Weekly Budget</h1>
+        <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">Dollar Drip</h1>
         <p className="text-slate-400 text-lg mb-10 leading-relaxed">
           Track spending together.<br />Stay on the same page.
         </p>
@@ -623,7 +623,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
     const isiOS = /iphone|ipad|ipod/i.test(ua);
     const isAndroid = /android/i.test(ua);
     const hint = isiOS
-      ? 'Install this app: tap Share, then “Add to Home Screen.”'
+          ? 'Install Dollar Drip: tap Share, then “Add to Home Screen.”'
       : isAndroid
       ? 'Install this app from your browser menu.'
       : 'Install this app from your browser menu.';
@@ -843,7 +843,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         <div className="mx-5 mt-4 rounded-2xl bg-slate-900 border border-slate-800 p-4 text-sm text-slate-300">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-white font-medium mb-1">Install Weekly Budget</div>
+              <div className="text-white font-medium mb-1">Install Dollar Drip</div>
               <div className="text-slate-400">{installHintText}</div>
             </div>
             <button onClick={handleDismissHint} className="text-slate-500 hover:text-slate-300 text-lg leading-none">×</button>
@@ -992,7 +992,7 @@ function SettingsScreen({ household, onBack, onLogout, sessionToken, onUpdateHou
 
         <div className="bg-slate-900 rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400">Weekly Budget</span>
+            <span className="text-slate-400">Budget</span>
             {!editingBudget ? (
               <button onClick={() => setEditingBudget(true)} className="text-emerald-400 text-sm">
                 Edit
