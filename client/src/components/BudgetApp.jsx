@@ -266,9 +266,7 @@ function MagicLinkScreen({ email, setEmail, onRequest, onBack, status, isPwa, ot
           <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send link</Button>
         )}
         {isPwa && status !== 'sent' && (
-          <button onClick={onRequest} disabled={!validateEmail(email)} className="text-sm text-slate-500 hover:text-slate-400">
-            Resend code
-          </button>
+          <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send code</Button>
         )}
         {status === 'sent' && isPwa && (
           <Button onClick={onVerify} disabled={otpCode.trim().length !== 6} className="w-full" variant="secondary">
