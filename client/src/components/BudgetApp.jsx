@@ -122,21 +122,37 @@ const BackButton = ({ onClick }) => (
   </button>
 );
 
-const NumericKeypad = ({ value, onChange }) => {
+const NumericKeypad = ({ value, onChange, onDigit, onClear, onBackspace, maxLength = 5 }) => {
   const handleDigit = (digit) => {
+    if (onDigit) {
+      onDigit(digit);
+      return;
+    }
     if (value === '0') {
       onChange(digit);
-    } else if (value.length < 5) {
+    } else if (value.length < maxLength) {
       onChange(value + digit);
     }
   };
 
   const handleBackspace = () => {
+    if (onBackspace) {
+      onBackspace();
+      return;
+    }
     if (value.length <= 1) {
       onChange('0');
     } else {
       onChange(value.slice(0, -1));
     }
+  };
+
+  const handleClear = () => {
+    if (onClear) {
+      onClear();
+      return;
+    }
+    onChange('0');
   };
 
   const KeypadButton = ({ children, onClick, className = '' }) => (
@@ -155,7 +171,7 @@ const NumericKeypad = ({ value, onChange }) => {
           {digit}
         </KeypadButton>
       ))}
-      <KeypadButton onClick={() => onChange('0')} className="bg-slate-900 text-slate-400 hover:bg-slate-800 text-base">
+      <KeypadButton onClick={handleClear} className="bg-slate-900 text-slate-400 hover:bg-slate-800 text-base">
         Clear
       </KeypadButton>
       <KeypadButton onClick={() => handleDigit('0')} className="bg-slate-900 text-white hover:bg-slate-800">
@@ -179,19 +195,43 @@ function WelcomeScreen({ onGetStarted, onMagicLink }) {
 
         <Button onClick={onGetStarted} className="w-full mb-4">Get Started</Button>
         <button onClick={onMagicLink} className="text-slate-500 hover:text-slate-400 transition-colors text-sm">
-          Get a magic link
+          Log in with an existing account
         </button>
       </div>
     </div>
   );
 }
 
+function OtpBoxes({ value }) {
+  const digits = value.padEnd(6, ' ').slice(0, 6).split('');
+  return (
+    <div className="grid grid-cols-6 gap-2">
+      {digits.map((digit, index) => (
+        <div
+          key={`${digit}-${index}`}
+          className="h-12 rounded-xl bg-slate-900 border border-slate-800 text-white flex items-center justify-center text-lg font-semibold"
+        >
+          {digit === ' ' ? '' : digit}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MagicLinkScreen({ email, setEmail, onRequest, onBack, status, isPwa, otpCode, setOtpCode, onVerify }) {
+  const handleOtpDigit = (digit) => {
+    if (otpCode.length >= 6) return;
+    setOtpCode(`${otpCode}${digit}`);
+  };
+
+  const handleOtpClear = () => setOtpCode('');
+  const handleOtpBackspace = () => setOtpCode(otpCode.slice(0, -1));
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col p-6">
       <div className="mb-8"><BackButton onClick={onBack} /></div>
       <div className="flex-1 flex flex-col">
-        <h1 className="text-3xl font-bold text-white mb-2">Get a magic link</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">Log in</h1>
         <p className="text-slate-400 mb-8">Enter the email you used for your budget.</p>
         <div className="space-y-4">
           <Input value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
@@ -202,11 +242,19 @@ function MagicLinkScreen({ email, setEmail, onRequest, onBack, status, isPwa, ot
           </div>
         )}
         {status === 'sent' && isPwa && (
-          <div className="mt-6 space-y-3">
-            <div className="text-sm text-slate-400">
-              We sent a one-time code. Enter it below to sign in.
-            </div>
-            <Input value={otpCode} onChange={setOtpCode} placeholder="6-digit code" type="text" />
+          <div className="mt-6 space-y-4">
+            <div className="text-sm text-slate-400">We sent a one-time code.</div>
+            <OtpBoxes value={otpCode} />
+            <NumericKeypad
+              value={otpCode}
+              onDigit={handleOtpDigit}
+              onClear={handleOtpClear}
+              onBackspace={handleOtpBackspace}
+              maxLength={6}
+            />
+            <button onClick={onRequest} className="text-sm text-slate-500 hover:text-slate-400">
+              Resend code
+            </button>
           </div>
         )}
         {status === 'error' && (
@@ -214,7 +262,14 @@ function MagicLinkScreen({ email, setEmail, onRequest, onBack, status, isPwa, ot
         )}
       </div>
       <div className="mt-auto pt-6 space-y-4">
-        <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send link</Button>
+        {!isPwa && (
+          <Button onClick={onRequest} disabled={!validateEmail(email)} className="w-full">Send link</Button>
+        )}
+        {isPwa && status !== 'sent' && (
+          <button onClick={onRequest} disabled={!validateEmail(email)} className="text-sm text-slate-500 hover:text-slate-400">
+            Resend code
+          </button>
+        )}
         {status === 'sent' && isPwa && (
           <Button onClick={onVerify} disabled={otpCode.trim().length !== 6} className="w-full" variant="secondary">
             Verify code
@@ -1225,14 +1280,25 @@ export default function BudgetApp() {
         method: 'POST',
         body: { email: magicEmail.trim(), code: otpCode.trim() },
       });
-      if (res.session?.token && res.session?.member?.id && res.session?.household?.id) {
-        localStorage.setItem('budgetSessionToken', res.session.token);
-        localStorage.setItem('budgetCurrentUserId', res.session.member.id);
-        localStorage.setItem('budgetHouseholdId', res.session.household.id);
-        setScreen('tracker');
-      } else {
+      if (!res.session?.token || !res.session?.member?.id || !res.session?.household?.id) {
         setMagicStatus('error');
+        return;
       }
+
+      localStorage.setItem('budgetSessionToken', res.session.token);
+      localStorage.setItem('budgetCurrentUserId', res.session.member.id);
+      localStorage.setItem('budgetHouseholdId', res.session.household.id);
+      setSessionToken(res.session.token);
+
+      const householdRes = await apiRequest(`/api/households/${res.session.household.id}`, {
+        token: res.session.token,
+      });
+      setHousehold(householdRes.household);
+      const member =
+        householdRes.household.members.find((m) => m._id === res.session.member.id) ||
+        householdRes.household.members[0];
+      setCurrentUser(member);
+      setScreen('tracker');
     } catch (err) {
       setMagicStatus('error');
     }
