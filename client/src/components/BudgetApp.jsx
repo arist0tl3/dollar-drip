@@ -632,6 +632,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [serverWeekStart, setServerWeekStart] = useState(null);
+  const [serverWeeklyBudget, setServerWeeklyBudget] = useState(null);
   const [showInstallHint, setShowInstallHint] = useState(false);
   const [installHintText, setInstallHintText] = useState('');
 
@@ -652,8 +653,9 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   );
 
   const totalSpent = weeklyTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const remaining = household.weeklyBudget - totalSpent;
-  const percentRemaining = Math.max(0, Math.min(100, (remaining / household.weeklyBudget) * 100));
+  const effectiveWeeklyBudget = serverWeeklyBudget ?? household.weeklyBudget;
+  const remaining = effectiveWeeklyBudget - totalSpent;
+  const percentRemaining = Math.max(0, Math.min(100, (remaining / effectiveWeeklyBudget) * 100));
 
   const favoriteIds = household.favoriteCategoryIds?.length ? household.favoriteCategoryIds : DEFAULT_FAVORITES;
   const favoriteCategories = ALL_CATEGORIES.filter((cat) => favoriteIds.includes(cat.id));
@@ -711,6 +713,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         });
         setTransactions(res.transactions || []);
         if (res.weekStart) setServerWeekStart(res.weekStart);
+        if (typeof res.weeklyBudget === 'number') setServerWeeklyBudget(res.weeklyBudget);
       } catch (err) {
         setError(err.message || 'Could not load transactions');
       } finally {
@@ -737,6 +740,9 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         token: sessionToken,
       });
       setTransactions([res.transaction, ...transactions]);
+      if (typeof res.newBalance?.weeklyBudget === 'number') {
+        setServerWeeklyBudget(res.newBalance.weeklyBudget);
+      }
       setAmount('0');
       setSelectedCategory(null);
       setNote('');
@@ -757,6 +763,9 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         { method: 'DELETE', token: sessionToken }
       );
       setTransactions(transactions.map((t) => (t._id === id ? { ...t, deletedAt: new Date().toISOString() } : t)));
+      if (typeof res.newBalance?.weeklyBudget === 'number') {
+        setServerWeeklyBudget(res.newBalance.weeklyBudget);
+      }
       onRefreshHousehold(res.household);
     } catch (err) {
       setError(err.message || 'Unable to delete');
@@ -927,7 +936,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
         <div className={`text-5xl font-extrabold mb-1 transition-all duration-300 ${budgetColor} ${justLogged ? 'scale-95' : 'scale-100'}`}>
           {formatCurrency(remaining)}
         </div>
-        <div className="text-sm text-slate-500">of {formatCurrency(household.weeklyBudget)} budget</div>
+        <div className="text-sm text-slate-500">of {formatCurrency(effectiveWeeklyBudget)} budget</div>
         <div className="mt-3 h-2 bg-slate-800 rounded-full overflow-hidden">
           <div className={`h-full rounded-full transition-all duration-500 ease-out ${barColor}`} style={{ width: `${percentRemaining}%` }} />
         </div>
@@ -1249,6 +1258,7 @@ export default function BudgetApp() {
     setCarryOverSurplus(false);
     setCarryOverDebt(true);
     setSessionToken(null);
+    setServerWeeklyBudget(null);
     setMagicEmail('');
     setMagicStatus('idle');
     setOtpCode('');
