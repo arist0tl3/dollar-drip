@@ -213,8 +213,12 @@ app.post('/api/auth/magic-link', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Email service not configured' });
     }
 
-    const client = new postmark.ServerClient(postmarkToken);
     if (isPwa && otpCode) {
+      if (isDevEnv()) {
+        console.log(`[auth] OTP for ${member.email}: ${otpCode}`);
+        return res.json({ success: true, message: 'OTP sent (dev)' });
+      }
+      const client = new postmark.ServerClient(postmarkToken);
       await client.sendEmail(
         buildOtpEmail({
           to: member.email,
@@ -224,12 +228,14 @@ app.post('/api/auth/magic-link', async (req, res) => {
           messageStream: postmarkStream,
         })
       );
-      if (isDevEnv()) {
-        console.log(`[auth] OTP for ${member.email}: ${otpCode}`);
-      }
       return res.json({ success: true, message: 'OTP sent' });
     }
 
+    if (isDevEnv()) {
+      console.log(`[auth] Magic link for ${member.email}: ${link}`);
+      return res.json({ success: true, message: 'Magic link sent (dev)' });
+    }
+    const client = new postmark.ServerClient(postmarkToken);
     await client.sendEmail(
       buildMagicLinkEmail({
         to: member.email,
@@ -239,9 +245,6 @@ app.post('/api/auth/magic-link', async (req, res) => {
         messageStream: postmarkStream,
       })
     );
-    if (isDevEnv()) {
-      console.log(`[auth] Magic link for ${member.email}: ${link}`);
-    }
 
     return res.json({ success: true, message: 'Magic link sent' });
   } catch (err) {
