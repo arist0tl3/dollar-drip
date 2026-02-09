@@ -1,10 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import postmark from 'postmark';
 import { connectDB } from './db.js';
 import { getCarryOverAmount } from './carryover.js';
+import { buildMagicLinkEmail, buildOtpEmail } from './authEmail.js';
+import { generateOtpCode, hashOtp, isDevEnv } from './authOtp.js';
 import Household from './models/Household.js';
 import Member from './models/Member.js';
 import Transaction from './models/Transaction.js';
@@ -190,13 +191,12 @@ app.post('/api/auth/magic-link', async (req, res) => {
     let otpCode = null;
 
     if (isPwa) {
-      otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
-      member.otpHash = otpHash;
+      otpCode = generateOtpCode();
+      member.otpHash = hashOtp(otpCode);
       member.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
       member.otpAttempts = 0;
     } else {
-      token = crypto.randomBytes(32).toString('hex');
+      token = randomToken();
       member.magicToken = token;
       member.magicTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
@@ -215,25 +215,33 @@ app.post('/api/auth/magic-link', async (req, res) => {
 
     const client = new postmark.ServerClient(postmarkToken);
     if (isPwa && otpCode) {
-      await client.sendEmail({
-        From: postmarkFrom,
-        To: member.email,
-        Subject: `Your login code for ${household?.name || 'Dollar Drip'}`,
-        HtmlBody: `<p>Your one-time code:</p><p style="font-size:24px;font-weight:bold;letter-spacing:2px;">${otpCode}</p><p>This code expires in 10 minutes.</p>`,
-        TextBody: `Your one-time code: ${otpCode}\n\nThis code expires in 10 minutes.`,
-        MessageStream: postmarkStream,
-      });
+      await client.sendEmail(
+        buildOtpEmail({
+          to: member.email,
+          from: postmarkFrom,
+          code: otpCode,
+          householdName: household?.name,
+          messageStream: postmarkStream,
+        })
+      );
+      if (isDevEnv()) {
+        console.log(`[auth] OTP for ${member.email}: ${otpCode}`);
+      }
       return res.json({ success: true, message: 'OTP sent' });
     }
 
-    await client.sendEmail({
-      From: postmarkFrom,
-      To: member.email,
-      Subject: `Your magic link for ${household?.name || 'Dollar Drip'}`,
-      HtmlBody: `<p>Click to sign in:</p><p><a href="${link}">${link}</a></p><p>This link expires in 24 hours.</p>`,
-      TextBody: `Sign in: ${link}\n\nThis link expires in 24 hours.`,
-      MessageStream: postmarkStream,
-    });
+    await client.sendEmail(
+      buildMagicLinkEmail({
+        to: member.email,
+        from: postmarkFrom,
+        link,
+        householdName: household?.name,
+        messageStream: postmarkStream,
+      })
+    );
+    if (isDevEnv()) {
+      console.log(`[auth] Magic link for ${member.email}: ${link}`);
+    }
 
     return res.json({ success: true, message: 'Magic link sent' });
   } catch (err) {
@@ -256,8 +264,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     if (member.otpExpires < new Date()) {
       return res.status(400).json({ success: false, error: 'Invalid or expired code' });
     }
-    const otpHash = crypto.createHash('sha256').update(code).digest('hex');
-    if (otpHash !== member.otpHash) {
+    if (hashOtp(code) !== member.otpHash) {
       member.otpAttempts += 1;
       await member.save();
       return res.status(400).json({ success: false, error: 'Invalid or expired code' });
