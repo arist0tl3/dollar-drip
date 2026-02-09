@@ -47,6 +47,26 @@ function sanitizeHousehold(household, members) {
   };
 }
 
+async function getCarryOverAmount(household, targetWeekStart) {
+  const prevWeekStart = new Date(targetWeekStart);
+  prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+
+  const prevWeekTransactions = await Transaction.find({
+    householdId: household._id,
+    weekStart: prevWeekStart,
+    deletedAt: null,
+  });
+
+  if (prevWeekTransactions.length === 0) return 0;
+
+  const prevTotal = prevWeekTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const prevRemaining = household.weeklyBudget - prevTotal;
+
+  if (prevRemaining > 0 && household.carryOverSurplus) return prevRemaining;
+  if (prevRemaining < 0 && household.carryOverDebt) return prevRemaining;
+  return 0;
+}
+
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.post('/api/households', async (req, res) => {
@@ -336,14 +356,17 @@ app.get('/api/households/:id/transactions', authMiddleware, async (req, res) => 
     }
     const transactions = await Transaction.find(filter).sort({ createdAt: -1 });
     const household = await Household.findById(id);
-    const currentWeekStart = getWeekStart(household.timezone, household.resetDay).toISOString();
-    const weekly = transactions.filter((t) => t.weekStart.toISOString() === currentWeekStart);
+    const currentWeekStart = getWeekStart(household.timezone, household.resetDay);
+    const currentWeekStartIso = currentWeekStart.toISOString();
+    const weekly = transactions.filter((t) => t.weekStart.toISOString() === currentWeekStartIso);
     const totalSpent = weekly.reduce((sum, t) => sum + t.amount, 0);
+    const carryOver = await getCarryOverAmount(household, currentWeekStart);
+    const effectiveBudget = household.weeklyBudget + carryOver;
     return res.json({
-      weekStart: currentWeekStart,
-      weeklyBudget: household.weeklyBudget,
+      weekStart: currentWeekStartIso,
+      weeklyBudget: effectiveBudget,
       totalSpent,
-      remaining: household.weeklyBudget - totalSpent,
+      remaining: effectiveBudget - totalSpent,
       transactions,
     });
   } catch (err) {
@@ -378,12 +401,14 @@ app.post('/api/households/:id/transactions', authMiddleware, async (req, res) =>
 
     const weeklyTransactions = await Transaction.find({ householdId: household._id, weekStart, deletedAt: null });
     const totalSpent = weeklyTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const carryOver = await getCarryOverAmount(household, weekStart);
+    const effectiveBudget = household.weeklyBudget + carryOver;
 
     return res.json({
       success: true,
       transaction,
       household,
-      newBalance: { totalSpent, remaining: household.weeklyBudget - totalSpent },
+      newBalance: { totalSpent, remaining: effectiveBudget - totalSpent, weeklyBudget: effectiveBudget },
     });
   } catch (err) {
     console.error(err);
@@ -403,7 +428,13 @@ app.delete('/api/households/:id/transactions/:transactionId', authMiddleware, as
     await transaction.save();
     const weekly = await Transaction.find({ householdId: id, weekStart: transaction.weekStart, deletedAt: null });
     const totalSpent = weekly.reduce((sum, t) => sum + t.amount, 0);
-    return res.json({ success: true, newBalance: { totalSpent, remaining: household.weeklyBudget - totalSpent }, household });
+    const carryOver = await getCarryOverAmount(household, transaction.weekStart);
+    const effectiveBudget = household.weeklyBudget + carryOver;
+    return res.json({
+      success: true,
+      newBalance: { totalSpent, remaining: effectiveBudget - totalSpent, weeklyBudget: effectiveBudget },
+      household,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ success: false, error: 'Failed to delete transaction' });
