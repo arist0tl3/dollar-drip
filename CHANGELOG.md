@@ -12,6 +12,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - OTP login for PWA users with numeric keypad entry.
 - Postmark email delivery for magic links and OTP codes.
 - Carry-over budget logic for weekly resets.
+- Hidden reverse-expense flow in the avatar menu that logs negative transactions with normal amount/category entry.
 
 ### Changed
 - App name and PWA assets updated to Dollar Drip.
@@ -20,6 +21,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Fixed
 - Mongo connection now initializes on server startup.
+- Transaction creation now accepts negative amounts (still rejects zero) so reverse expenses can be saved.
 
 ## [0.1.0] - 2026-01-29
 ### Added

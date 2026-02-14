@@ -5,6 +5,7 @@ A shared household budget tracker that lets multiple people log weekly expenses 
 ## What it is
 - Shared household budget with members and weekly reset
 - Fast expense logging with categories and optional notes
+- Hidden reverse-expense option in the avatar menu for refunds/adjustments
 - Real-time-ish sync via polling
 - PWA installable with offline fallback
 
