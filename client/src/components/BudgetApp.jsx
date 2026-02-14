@@ -627,6 +627,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
   const [showHistory, setShowHistory] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [isReverseExpense, setIsReverseExpense] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [justLogged, setJustLogged] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -724,13 +725,34 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
     return undefined;
   }, [household._id, sessionToken]);
 
+  const resetExpenseForm = () => {
+    setAmount('0');
+    setSelectedCategory(null);
+    setNote('');
+    setShowNoteInput(false);
+    setShowAllCategories(false);
+  };
+
+  const openExpenseForm = (reverse = false) => {
+    setIsReverseExpense(reverse);
+    setShowMenu(false);
+    setShowAddExpense(true);
+  };
+
+  const closeExpenseForm = () => {
+    setShowAddExpense(false);
+    setIsReverseExpense(false);
+    resetExpenseForm();
+  };
+
   const handleSubmit = async () => {
     const parsedAmount = parseInt(amount, 10);
     if (!parsedAmount || parsedAmount <= 0 || !selectedCategory) return;
+    const signedAmount = isReverseExpense ? -parsedAmount : parsedAmount;
 
     try {
       const payload = {
-        amount: parsedAmount,
+        amount: signedAmount,
         category: selectedCategory,
         note: note.trim(),
       };
@@ -743,11 +765,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
       if (typeof res.newBalance?.weeklyBudget === 'number') {
         setServerWeeklyBudget(res.newBalance.weeklyBudget);
       }
-      setAmount('0');
-      setSelectedCategory(null);
-      setNote('');
-      setShowNoteInput(false);
-      setShowAddExpense(false);
+      closeExpenseForm();
       setJustLogged(true);
       setTimeout(() => setJustLogged(false), 1500);
       onRefreshHousehold(res.household);
@@ -901,6 +919,12 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
                 Settings
               </button>
               <button
+                onClick={() => openExpenseForm(true)}
+                className="w-full text-left px-4 py-2 text-xs text-slate-500 hover:bg-slate-800"
+              >
+                Reverse expense
+              </button>
+              <button
                 onClick={() => {
                   setShowMenu(false);
                   onLogout();
@@ -960,7 +984,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
           </div>
         </div>
 
-        <Button onClick={() => setShowAddExpense(true)} className="w-full mt-auto">
+        <Button onClick={() => openExpenseForm(false)} className="w-full mt-auto">
           Add expense
         </Button>
       </div>
@@ -968,13 +992,14 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
       {showAddExpense && (
         <div className="fixed inset-0 bg-slate-950 z-20 flex flex-col">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/50">
-            <BackButton onClick={() => setShowAddExpense(false)} />
-            <h1 className="font-semibold">Add expense</h1>
+            <BackButton onClick={closeExpenseForm} />
+            <h1 className="font-semibold">{isReverseExpense ? 'Reverse expense' : 'Add expense'}</h1>
             <div className="w-12" />
           </div>
           <div className="flex-1 px-5 py-4 flex flex-col">
             <div className="text-center mb-3">
               <div className="text-4xl font-bold">
+                {isReverseExpense && <span className="text-slate-500">-</span>}
                 <span className="text-slate-500">$</span>
                 <span>{amount}</span>
               </div>
@@ -1022,7 +1047,7 @@ function BudgetTracker({ household, currentUser, sessionToken, onOpenSettings, o
             </button>
 
             <Button onClick={handleSubmit} disabled={parseInt(amount, 10) <= 0 || !selectedCategory} className="w-full mt-auto">
-              {justLogged ? '✓ Logged!' : 'Add expense'}
+              {justLogged ? '✓ Logged!' : isReverseExpense ? 'Add reverse expense' : 'Add expense'}
             </Button>
           </div>
         </div>

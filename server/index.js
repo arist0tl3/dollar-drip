@@ -374,7 +374,7 @@ app.post('/api/households/:id/transactions', authMiddleware, async (req, res) =>
     if (!household) return res.status(404).json({ success: false, error: 'Household not found' });
     if (!household._id.equals(req.session.householdId)) return res.status(403).json({ success: false, error: 'Forbidden' });
     const parsedAmount = Number(amount);
-    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
+    if (!Number.isInteger(parsedAmount) || parsedAmount === 0) {
       return res.status(400).json({ success: false, error: 'Invalid amount' });
     }
     const weekStart = getWeekStart(household.timezone, household.resetDay);
